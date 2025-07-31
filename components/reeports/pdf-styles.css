@@ -1,0 +1,146 @@
+/* PDF Report Styles */
+.pdf-page {
+  width: 210mm;
+  min-height: 297mm;
+  page-break-after: always;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.pdf-content {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.report-page {
+  page-break-after: always;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.report-container {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.vertical-align-middle {
+  vertical-align: middle;
+}
+
+.vertical-align-top {
+  vertical-align: top;
+}
+
+/* Table styles for PDF */
+.pdf-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.pdf-table th,
+.pdf-table td {
+  border: 1px solid black;
+  padding: 4px 8px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.pdf-table th {
+  font-weight: bold;
+  background-color: #f8f9fa;
+}
+
+/* Print media queries */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+    font-size: 10px;
+  }
+  
+  .pdf-page,
+  .report-page {
+    margin: 0;
+    box-shadow: none;
+    page-break-after: always;
+    width: 100%;
+    min-height: 100vh;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure colors are preserved in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Hide browser print elements */
+  @page {
+    margin: 0;
+    size: A4;
+  }
+}
+
+/* Landscape orientation for report pages */
+@media print and (orientation: landscape) {
+  .report-page {
+    width: 297mm;
+    min-height: 210mm;
+  }
+  
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+}
+
+/* Portrait orientation for cover and invoice */
+@media print and (orientation: portrait) {
+  .pdf-page {
+    width: 210mm;
+    min-height: 297mm;
+  }
+  
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}
+
+/* Loading and error states */
+.pdf-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  font-size: 16px;
+  color: #666;
+}
+
+.pdf-error {
+  padding: 20px;
+  margin: 20px;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  color: #c33;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+  .pdf-page,
+  .report-page {
+    width: 100%;
+    min-height: auto;
+    margin: 10px;
+    padding: 10px;
+  }
+  
+  .pdf-table {
+    font-size: 8px;
+  }
+}

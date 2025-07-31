@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma-client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  orders    Order[] // Operators create orders
+  reports   Report[] // Operators generate reports
+}
+
+model Client {
+  id         String     @id @default(cuid())
+  name       String
+  address    String?
+  phone      String?    @unique
+  clientType ClientType
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  orders     Order[] // Clients are linked to orders created by operators
+  invoices   Invoice[] // Clients receive invoices
+  reports    Report[] // NEW: Clients can access multiple reports generated for their orders
+
+  @@index([phone]) // Index for faster phone number lookups
+}
+
+model Agrotest {
+  id            String          @id @default(uuid())
+  name          String          @unique
+  sampleType    SampleType
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  testParameter TestParameter[]
+  orderItems    OrderItem[]
+}
+
+model TestParameter {
+  id                  String               @id @default(uuid())
+  agroTestID          String
+  name                String
+  unit                String?
+  analysisType        AnalysisType? // Optional field, defaults to null when not specified
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  agroTest            Agrotest             @relation(fields: [agroTestID], references: [id])
+  pricing             Pricing[]
+  comparisonRules     ComparisonRule[]
+  testResults         TestResult[]
+  orderTestParameters OrderTestParameter[]
+}
+
+model Sample {
+  id                 String       @id @default(uuid())
+  orderId            String // Each sample is associated with an order taken by an operator
+  orderItemId        String // One-to-many relationship with OrderItem
+  sampleIdNumber     String       @unique
+  collectionDate     DateTime     @db.Date
+  sampleType         SampleType
+  collectionLocation String?
+  cropType           String?
+  bunot              String? // Type of bunot 
+  manchitroUnit      Int?
+  vumiSrini          String? // Vumi Srini 
+  status             SampleStatus @default(PENDING) // Track sample processing status
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  order              Order        @relation(fields: [orderId], references: [id])
+  orderItem          OrderItem    @relation(fields: [orderItemId], references: [id])
+  testResults        TestResult[] // Results for this sample 
+  report             Report?      @relation(fields: [reportId], references: [id])
+  reportId           String? // Removed @unique constraint
+}
+
+model TestResult {
+  id                    String        @id @default(uuid())
+  sampleId              String
+  testParameterId       String
+  value                 Float? // This will be used for BOTH category or as default
+  interpretation        String? // Interpretation of the test result
+  uplandInterpretation  String? // Interpretation of the test result
+  wetlandInterpretation String? // Interpretation of the test result
+  analysisType          AnalysisType? // Optional field, defaults to null when not specified
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  sample                Sample        @relation(fields: [sampleId], references: [id])
+  testParamater         TestParameter @relation(fields: [testParameterId], references: [id])
+}
+
+model ComparisonRule {
+  id              String         @id @default(uuid())
+  testParameterId String
+  soilCategory    SoilCategory?
+  min             Float?
+  max             Float?
+  interpretation  String?
+  type            ComparisonType @default(BETWEEN)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  testParameter   TestParameter  @relation(fields: [testParameterId], references: [id], onDelete: Cascade)
+}
+
+model Pricing {
+  id             String        @id @default(uuid())
+  clientType     ClientType
+  testParamterId String
+  price          Float
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  testParamater  TestParameter @relation(fields: [testParamterId], references: [id])
+
+  @@unique([clientType, testParamterId])
+}
+
+model Institute {
+  id        String   @id @default("singleton")
+  prapok    String
+  name      String
+  address   String
+  issuedby  String
+  phone     String?
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  clientId    String // The client for whom the order is placed
+  sarokNumber String?     @unique
+  orderDate   DateTime    @default(now())
+  status      OrderStatus @default(PENDING) // Current status of the order (e.g., PENDING, COMPLETED)
+  operatorId  String // The User (operator) who took the order
+  totalAmount Float // Calculated total of all order items, including all chosen parameters
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  client      Client      @relation(fields: [clientId], references: [id])
+  operator    User        @relation(fields: [operatorId], references: [id])
+  samples     Sample[] // All samples associated with this order
+  orderItems  OrderItem[] // All tests requested in this order, broken down by agrotest
+  invoice     Invoice? // An order has one invoice
+  invoiceId   String?     @unique // Foreign key for the Invoice
+  report      Report? // An order has one comprehensive customer report
+  reportId    String?     @unique // Foreign key for the Report
+}
+
+model OrderItem {
+  id                  String               @id @default(uuid())
+  orderId             String
+  agroTestId          String // The type of agrotest requested (e.g., Soil Analysis)
+  quantity            Int                  @default(1) // Number of samples for this specific agrotest
+  unitPrice           Float // Price of the agrotest type (or sum of parameters) at the time of order
+  subtotal            Float // quantity * unitPrice
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  order               Order                @relation(fields: [orderId], references: [id])
+  agroTest            Agrotest             @relation(fields: [agroTestId], references: [id])
+  orderTestParameters OrderTestParameter[] // Specific parameters chosen for this agrotest in the order
+  sample              Sample[] // One-to-many relationship with Sample
+}
+
+model OrderTestParameter {
+  id              String        @id @default(uuid())
+  orderItemId     String
+  testParameterId String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+  testParameter   TestParameter @relation(fields: [testParameterId], references: [id])
+
+  @@unique([orderItemId, testParameterId])
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  orderId     String        @unique // Each invoice belongs to one order
+  clientId    String // Redundant with orderId, but useful for direct client access
+  invoiceDate DateTime      @default(now()) @db.Date
+  dueDate     DateTime?     @db.Date
+  totalAmount Float // Final calculated amount
+  paidAmount  Float         @default(0.0) // Track payments
+  status      InvoiceStatus // PAID, DUE, CANCELLED
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  order       Order         @relation(fields: [orderId], references: [id])
+  client      Client        @relation(fields: [clientId], references: [id])
+  report      Report? // Invoice can be linked to the report it's part of
+  reportId    String?       @unique // Foreign key for the Report
+}
+
+model Report {
+  id                String       @id @default(uuid())
+  orderId           String       @unique // Each report is for one specific order (contains all samples)
+  clientId          String // Direct link to the client for whom this report was generated
+  invoiceId         String?      @unique // Link to the invoice that accompanies this report
+  reportType        String       @default("Combined Test Report") // More generic, e.g., "Combined Test Report"
+  reportNumber      String       @unique // Unique report identifier
+  issueDate         DateTime     @default(now())
+  status            ReportStatus @default(DRAFT)
+  recommendations   String? // Overall recommendations for the order
+  notes             String? // General notes for the report
+  generatedByUserId String // The User (operator) who generated this report
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  order             Order        @relation(fields: [orderId], references: [id])
+  client            Client       @relation(fields: [clientId], references: [id])
+  invoice           Invoice?     @relation(fields: [invoiceId], references: [id])
+  generator         User         @relation(fields: [generatedByUserId], references: [id])
+  samples           Sample[]
+}
+
+enum ClientType {
+  FARMER
+  GOVT_ORG
+  PRIVATE
+}
+
+enum SampleType {
+  SOIL
+  WATER
+  FERTILIZER
+}
+
+enum AnalysisType {
+  ROUTINE // General routine analysis
+  SPECIAL // Special analysis
+  RESEARCH // Research analysis
+  Atomic_Absorption // Atomic Absorption Spectroscopy
+  Spectrophotmetric // Spectrophotometric method
+  Vacuum_Desiccator // Vacuum Desiccator method
+  OLSEN // Phosphorus analysis using Olsen method
+  BRAY // Phosphorus analysis using Bray method
+}
+
+enum SoilCategory {
+  BOTH
+  UPLAND
+  WETLAND
+}
+
+enum ComparisonType {
+  GREATER_THAN
+  LESS_THAN
+  BETWEEN
+}
+
+enum InvoiceStatus {
+  PAID
+  DUE
+  CANCELLED
+}
+
+enum ReportStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ISSUED
+}
+
+enum OrderStatus {
+  PENDING // Order created, samples may or may not have arrived yet
+  IN_PROGRESS // Samples received, testing commenced
+  TESTING_COMPLETED // All tests associated with the order are done
+  REPORT_GENERATED // Report(s) for the order's samples are ready
+  COMPLETED // Order is fully processed (reported, invoiced, paid)
+  CANCELLED // Order was cancelled
+}
+
+enum SampleStatus {
+  PENDING // Sample received, awaiting processing
+  IN_LAB // Sample is in the lab, awaiting testing
+  TESTING // Testing is in progress for this sample
+  TEST_COMPLETED // All required tests for this sample are done
+  REPORT_READY // Report generated for this sample
+  ISSUED // Report issued to client
+  CANCELLED // Sample processing cancelled
+}
